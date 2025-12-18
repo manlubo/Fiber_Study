@@ -1,0 +1,40 @@
+# 데이터 베이스
+postgres:
+  host: localhost
+  port: 5432
+  user: root
+  password: 1234
+  name: dev
+  sslMode: disable
+  maxOpenConns: 50
+  maxIdleConns: 20
+
+# 로깅
+log:
+  level: error
+
+# CORS
+cors:
+  allowOrigins:
+    - http://localhost:3000
+    - http://localhost:5173
+  allowMethods:
+    - GET
+    - POST
+    - PUT
+    - PATCH
+    - DELETE
+    - OPTIONS
+  allowHeaders:
+    - Content-Type
+    - Authorization
+  allowCredentials: true
+
+#Cookie
+cookie:
+  name: SH_REFRESH
+  path: /
+  httpOnly: true
+  secure: true
+  sameSite: Lax
+  maxAge: 14

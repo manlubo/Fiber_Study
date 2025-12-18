@@ -1,0 +1,11 @@
+# 빌드 파일
+/bin/
+/dist/
+/tmp/
+
+# IDE
+.idea/
+.vscode/
+
+# Air
+.air.toml
