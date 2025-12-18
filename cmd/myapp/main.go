@@ -37,6 +37,12 @@ func main() {
 		return
 	}
 	log.Info("PostgresDB 연결 성공")
+	if err := database.RunMigration(database.CreateDsn(&cfg.Postgres)); err != nil {
+		log.Error("데이터베이스 마이그레이션에 실패했습니다", log.MapErr("error", err))
+		return
+	}
+	log.Info("데이터베이스 마이그레이션 성공")
+
 	metricsDB := dbmetrics.New(postgresdb)
 
 	// JWT 환경설정 등록

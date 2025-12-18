@@ -16,31 +16,35 @@
 
 ## 3. 디렉토리 구조 (Directory Structure)
 
-```
 .
 ├── cmd/
-│   └── myapp/              # 애플리케이션 엔트리포인트 (main.go)
-├── configs/                # 환경별 설정 파일 (application-dev.yml, prod.yml)
-├── docs/                   # 프로젝트 문서 (project.md, develop.md 등)
-├── internal/               # 외부에서 import 불가능한 비공개 패키지
-│   ├── config/             # 설정 로드 (cleanenv, 구조체 정의)
-│   ├── database/           # DB 연결 관리 (pgxpool)
-│   ├── feature/            # ⭐ 핵심: 도메인(기능) 단위 패키지 구성
-│   │   ├── auth/           # 인증 도메인 (Handler, Service, Router, DTO)
-│   │   └── member/         # 회원 도메인 (Repository, Entity)
-│   ├── middleware/         # Fiber 글로벌 미들웨어 (CORS, Metrics)
-│   ├── router/             # 루트 라우터 및 라우트 등록
-│   └── shared/             # 도메인 간 공유되는 모델/코드 (BaseModel 등)
-├── pkg/                    # 외부에서도 사용 가능한 범용 패키지
-│   ├── dbmetrics/          # DB connection pool 모니터링
-│   ├── log/                # Zap 기반 커스텀 로거 (JSON/Console 지원)
-│   ├── response/           # API 표준 응답 포맷 (JSend 스타일)
-│   └── util/               # 유틸리티 (Path, Hash 등)
-├── scripts/                # 보조 스크립트
-├── test/                   # 테스트 코드
-├── .air.toml               # Air (Live Reload) 설정
-├── .env                    # 로컬 개발용 환경변수
-└── go.mod                  # Go 모듈 의존성 정의
+│ └── myapp/ # 애플리케이션 엔트리포인트 (main.go)
+├── configs/ # 환경별 설정 파일 (application-dev.yml, prod.yml)
+├── docs/ # 프로젝트 문서 (project.md, develop.md 등)
+├── internal/ # 외부에서 import 불가능한 비공개 패키지
+│ ├── config/ # 설정 로드 (cleanenv, 구조체 정의)
+│ ├── database/ # DB 연결 관리 (pgxpool)
+│ ├── feature/ # ⭐ 핵심: 도메인(기능) 단위 패키지 구성
+│ │ ├── auth/ # 인증 도메인 (Handler, Service, Router, DTO)
+│ │ └── member/ # 회원 도메인 (Repository, Entity)
+│ ├── middleware/ # Fiber 글로벌 미들웨어 (CORS, Metrics)
+│ ├── router/ # 루트 라우터 및 라우트 등록
+│ └── shared/ # 도메인 간 공유되는 모델/코드
+│ ├── db/ # DB 관련 공통 유틸
+│ ├── errorx/ # 커스텀 에러 패키지
+│ └── model/ # 공통 모델 (BaseModel 등)
+├── migrations/ # DB 마이그레이션 파일 (.sql)
+├── pkg/ # 외부에서도 사용 가능한 범용 패키지
+│ ├── dbmetrics/ # DB connection pool 모니터링
+│ ├── log/ # Zap 기반 커스텀 로거 (JSON/Console 지원)
+│ ├── response/ # API 표준 응답 포맷 (JSend 스타일)
+│ └── util/ # 유틸리티 (Path, Hash 등)
+├── scripts/ # 보조 스크립트
+├── test/ # 테스트 코드
+├── .air.toml # Air (Live Reload) 설정
+├── .env # 로컬 개발용 환경변수
+└── go.mod # Go 모듈 의존성 정의
+
 ```
 
 ---
@@ -100,6 +104,19 @@
 - **CORS**: `internal/middleware/cors.go`에서 설정(`config.Cors`)을 기반으로 허용 도메인/메서드를 제어합니다.
 - **Metrics**: API 응답 시간, 슬로우 쿼리 등을 측정하여 로그로 남깁니다.
 
+### 📦 공유 모듈 (`internal/shared`)
+
+- **Role**: 도메인 간 공통으로 사용되는 비즈니스 로직 및 유틸리티를 관리합니다.
+- **Components**:
+  - `errorx`: 커스텀 에러 타입 정의 및 에러 처리 유틸리티
+  - `model`: 공통 데이터 모델 (BaseModel 등)
+  - `db`: DB 관련 공통 헬퍼
+
+### 🗄️ 데이터베이스 마이그레이션 (`migrations`)
+
+- 데이터베이스 스키마 변경 사항을 `.sql` 파일로 버전 관리합니다.
+- `golang-migrate` 등의 도구를 사용하여 형상 관리를 수행합니다.
+
 ---
 
 ## 6. 개발 컨벤션 (Conventions)
@@ -107,3 +124,4 @@
 1. **명시적 의존성 주입 (DI)**: `main.go`에서 Config, DB, Service, Handler를 생성하고 연결합니다. 전역 변수 사용을 지양합니다.
 2. **에러 처리**: 에러는 `handler` 계층까지 전파(`return err`)하여 중앙에서 처리하거나 로그를 남깁니다. 에러 래핑(`fmt.Errorf("%w", err)`)을 권장합니다.
 3. **표준 응답**: 모든 API는 성공 시 `response.OK`, 실패 시 에러를 반환하여 일관된 JSON 구조(`result`, `data`, `message`)를 유지합니다.
+```
