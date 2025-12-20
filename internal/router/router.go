@@ -14,10 +14,10 @@ func Register(app *fiber.App, db db.DB, jwtService *auth.JwtService, cookieServi
 	v1 := api.Group("/v1")
 
 	// member
-	memberRepo := member.NewMemberRepository(db)
+	memberRepo := member.NewMemberRepository()
 
 	// auth
-	authService := auth.NewAuthService(memberRepo, jwtService)
+	authService := auth.NewAuthService(memberRepo, jwtService, db)
 	authHandler := auth.NewAuthHandler(authService, cookieService)
 	authRouter := auth.NewAuthRouter(authHandler)
 

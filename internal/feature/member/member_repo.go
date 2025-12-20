@@ -20,17 +20,15 @@ type Member struct {
 }
 
 // 레포지토리 스트럭처
-type MemberRepository struct {
-	db db.DB
-}
+type MemberRepository struct{}
 
 // 레포지토리 생성
-func NewMemberRepository(db db.DB) *MemberRepository {
-	return &MemberRepository{db: db}
+func NewMemberRepository() *MemberRepository {
+	return &MemberRepository{}
 }
 
 // 회원가입
-func (r *MemberRepository) Create(ctx context.Context, member *Member) error {
+func (r *MemberRepository) Create(ctx context.Context, exec db.Execer, member *Member) error {
 
 	query := `
 		INSERT INTO members (
@@ -47,7 +45,7 @@ func (r *MemberRepository) Create(ctx context.Context, member *Member) error {
 	`
 
 	var id int64
-	err := r.db.QueryRow(
+	err := exec.QueryRow(
 		ctx,
 		query,
 		member.Email,
@@ -67,8 +65,50 @@ func (r *MemberRepository) Create(ctx context.Context, member *Member) error {
 	return nil
 }
 
+// 기본 권한 추가
+func (r *MemberRepository) InsertDefaultRole(ctx context.Context, exec db.Execer, memberID int64) error {
+	query := `
+		INSERT INTO member_roles (member_id, role)
+		VALUES ($1, 'USER')
+	`
+
+	_, err := exec.Exec(ctx, query, memberID)
+	return err
+}
+
+// 권한 조회
+func (r *MemberRepository) GetRolesByMemberID(
+	ctx context.Context,
+	exec db.Execer,
+	memberID int64,
+) ([]string, error) {
+
+	query := `
+		SELECT role
+		FROM member_roles
+		WHERE member_id = $1
+	`
+
+	rows, err := exec.Query(ctx, query, memberID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	roles := make([]string, 0)
+	for rows.Next() {
+		var role string
+		if err := rows.Scan(&role); err != nil {
+			return nil, err
+		}
+		roles = append(roles, role)
+	}
+
+	return roles, nil
+}
+
 // 이메일로 회원 조회
-func (r *MemberRepository) FindByEmail(ctx context.Context, email string) (*Member, error) {
+func (r *MemberRepository) FindByEmail(ctx context.Context, exec db.Execer, email string) (*Member, error) {
 	query := `
 		SELECT
 			member_id,
@@ -87,7 +127,7 @@ func (r *MemberRepository) FindByEmail(ctx context.Context, email string) (*Memb
 	`
 
 	var member Member
-	err := r.db.QueryRow(ctx, query, email).Scan(
+	err := exec.QueryRow(ctx, query, email).Scan(
 		&member.ID,
 		&member.Email,
 		&member.Password,
@@ -109,7 +149,7 @@ func (r *MemberRepository) FindByEmail(ctx context.Context, email string) (*Memb
 }
 
 // ID로 회원 조회
-func (r *MemberRepository) FindByID(ctx context.Context, id int64) (*Member, error) {
+func (r *MemberRepository) FindByID(ctx context.Context, exec db.Execer, id int64) (*Member, error) {
 	query := `
 		SELECT
 			member_id,
@@ -128,7 +168,7 @@ func (r *MemberRepository) FindByID(ctx context.Context, id int64) (*Member, err
 	`
 
 	var member Member
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := exec.QueryRow(ctx, query, id).Scan(
 		&member.ID,
 		&member.Email,
 		&member.Password,
