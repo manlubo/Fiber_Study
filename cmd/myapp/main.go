@@ -4,6 +4,7 @@ import (
 	"study/internal/config"
 	"study/internal/database"
 	"study/internal/feature/auth"
+	"study/internal/metrics"
 	"study/internal/middleware"
 	"study/internal/router"
 	"study/pkg/dbmetrics"
@@ -22,15 +23,24 @@ func main() {
 		log.Error(".env 파일을 찾을 수 없습니다.", log.MapErr("error", err))
 	}
 
+	// config 로드
 	cfg, err := config.Load()
 	if err != nil {
 		log.Error("설정 파일을 불러오는데 실패했습니다", log.MapErr("error", err))
 	}
 
+	// fiber app 생성
 	app := fiber.New()
+
+	// metrics 초기화
+	metrics.Init()
+
+	// middleware 등록
 	app.Use(middleware.Cors(&cfg.Cors))
+	app.Use(metrics.Middleware())
 	app.Use(middleware.ApiMetrics())
 
+	// db 연결
 	postgresdb, err := database.NewPostgres(&cfg.Postgres)
 	if err != nil {
 		log.Error("PostgresDB 연결에 실패했습니다", log.MapErr("error", err))
@@ -45,20 +55,23 @@ func main() {
 
 	metricsDB := dbmetrics.New(postgresdb)
 
-	// JWT 환경설정 등록
+	// auth 관련
 	jwtService := auth.NewJwtService(&cfg.JWT)
-
-	// 쿠키 환경설정 등록
 	cookieService := auth.NewCookieService(&cfg.Cookie)
 	authMiddleware := middleware.NewAuthMiddlewareConfig(cfg.Cookie.Name)
 
-	// 라우터 등록
+	// 라우터
 	router.Register(app, metricsDB, jwtService, cookieService, authMiddleware)
 
+	// metrics 등록
+	metrics.Register(app)
+
+	// 기본 라우트
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.JSON(response.OK("Application is running PORT : "+cfg.App.Port, nil))
 	})
-	log.Info("Application is running", log.MapStr("port", cfg.App.Port))
 
+	// application 실행
+	log.Info("Application is running", log.MapStr("port", cfg.App.Port))
 	app.Listen(":" + cfg.App.Port)
 }
