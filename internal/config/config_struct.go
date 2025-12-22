@@ -42,3 +42,10 @@ type Cookie struct {
 	SameSite string `yaml:"sameSite"`
 	MaxAge   int    `yaml:"maxAge"`
 }
+
+type Observability struct {
+	Enabled      bool    `yaml:"enabled"`
+	ServiceName  string  `yaml:"serviceName"`
+	OtlpEndpoint string  `yaml:"otlpEndpoint"`
+	SampleRatio  float64 `yaml:"sampleRatio"`
+}

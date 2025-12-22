@@ -38,3 +38,10 @@ cookie:
   secure: false
   sameSite: Lax
   maxAge: 14
+
+# OpenTelemetry
+observability:
+  enabled: true
+  serviceName: myapp-dev
+  otlpEndpoint: localhost:4318
+  sampleRatio: 0.5

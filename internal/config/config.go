@@ -11,12 +11,13 @@ import (
 )
 
 type Config struct {
-	App      App
-	Postgres Postgres `yaml:"postgres"`
-	JWT      JWT
-	Log      Log    `yaml:"log"`
-	Cors     Cors   `yaml:"cors"`
-	Cookie   Cookie `yaml:"cookie"`
+	App           App
+	Postgres      Postgres `yaml:"postgres"`
+	JWT           JWT
+	Log           Log           `yaml:"log"`
+	Cors          Cors          `yaml:"cors"`
+	Cookie        Cookie        `yaml:"cookie"`
+	Observability Observability `yaml:"observability"`
 }
 
 func Load() (*Config, error) {

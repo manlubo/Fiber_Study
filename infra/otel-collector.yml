@@ -1,0 +1,37 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+      grpc:
+
+processors:
+  tail_sampling:
+    decision_wait: 10s
+    policies:
+      - name: error-traces
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+
+      - name: slow-traces
+        type: latency
+        latency:
+          threshold_ms: 500
+
+      - name: default-sample
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 5
+
+exporters:
+  otlp:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [tail_sampling]
+      exporters: [otlp]
