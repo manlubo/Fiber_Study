@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"study/internal/config"
 	"study/internal/database"
 	"study/internal/feature/auth"
 	"study/internal/metrics"
 	"study/internal/middleware"
+	"study/internal/observability"
 	"study/internal/router"
 	"study/pkg/dbmetrics"
 	"study/pkg/log"
@@ -29,6 +31,14 @@ func main() {
 		log.Error("설정 파일을 불러오는데 실패했습니다", log.MapErr("error", err))
 	}
 
+	// OpenTelemetry 초기화
+	shutdown, err := observability.InitTracer(&cfg.Observability)
+	if err != nil {
+		log.Error("OpenTelemetry 초기화에 실패했습니다", log.MapErr("error", err))
+		return
+	}
+	defer shutdown(context.Background())
+
 	// fiber app 생성
 	app := fiber.New()
 
@@ -36,6 +46,7 @@ func main() {
 	metrics.Init()
 
 	// middleware 등록
+	app.Use(observability.TraceMiddleware())
 	app.Use(middleware.Cors(&cfg.Cors))
 	app.Use(metrics.Middleware())
 	app.Use(middleware.ApiMetrics())

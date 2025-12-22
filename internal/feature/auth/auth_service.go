@@ -4,10 +4,13 @@ import (
 	"context"
 
 	"study/internal/feature/member"
+	"study/internal/observability"
 	"study/internal/shared/db"
 	"study/internal/shared/model"
 	"study/pkg/log"
 	"study/pkg/util"
+
+	"go.opentelemetry.io/otel/codes"
 )
 
 // AuthService
@@ -27,10 +30,10 @@ type LoginRequest struct {
 
 // 멤버 전달 객체
 type MemberResponse struct {
-	ID      int64    `json:"id"`
-	Email   string   `json:"email"`
-	Profile *string  `json:"profile"`
-	Roles   []string `json:"roles"`
+	ID      int64         `json:"id"`
+	Email   string        `json:"email"`
+	Profile *string       `json:"profile"`
+	Roles   []member.Role `json:"roles"`
 }
 
 // 로그인 응답 DTO
@@ -46,40 +49,51 @@ func NewAuthService(MemberRepository *member.MemberRepository, JwtService *JwtSe
 }
 
 // 회원가입
-func (s *AuthService) Register(ctx context.Context, member *member.Member) error {
+func (s *AuthService) Register(ctx context.Context, m *member.Member) error {
+	ctx, span := observability.Tracer.Start(ctx, "service.Register")
+	defer span.End()
 
 	// 트랜젝션 시작
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return err
 	}
 	defer tx.Rollback(ctx)
 
 	// 이메일 중복 체크
-	_, err = s.MemberRepository.FindByEmail(ctx, tx, member.Email)
+	_, err = s.MemberRepository.FindByEmail(ctx, tx, m.Email)
 	if err == nil {
+		span.AddEvent(ErrEmailAlreadyExists.Error())
 		return ErrEmailAlreadyExists
 	}
 
 	// 비밀번호 암호화
-	hashed, err := util.HashString(member.Password)
+	hashed, err := util.HashString(m.Password)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return err
 	}
-	member.Password = hashed
+	m.Password = hashed
 
 	// 상태값 부여
-	member.Status = model.StatusActive
+	m.Status = model.StatusActive
 
 	// 회원생성
-	err = s.MemberRepository.Create(ctx, tx, member)
+	err = s.MemberRepository.Create(ctx, tx, m)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return err
 	}
 
 	// 기본권한 추가
-	err = s.MemberRepository.InsertDefaultRole(ctx, tx, *member.ID)
+	err = s.MemberRepository.InsertRole(ctx, tx, *m.ID, member.RoleUser)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return err
 	}
 
@@ -89,6 +103,9 @@ func (s *AuthService) Register(ctx context.Context, member *member.Member) error
 
 // 로그인
 func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (*LoginResponse, error) {
+	ctx, span := observability.Tracer.Start(ctx, "service.Login")
+	defer span.End()
+
 	// 이메일로 회원 조회
 	member, err := s.MemberRepository.FindByEmail(ctx, s.DB, req.Email)
 	if err != nil {
@@ -126,7 +143,10 @@ func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (*LoginRespo
 }
 
 // 리프레쉬 토큰으로 로그인 상태 유지
-func (s *AuthService) refresh(ctx context.Context, refreshToken string) (*LoginResponse, error) {
+func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*LoginResponse, error) {
+	ctx, span := observability.Tracer.Start(ctx, "service.Refresh")
+	defer span.End()
+
 	// refresh token 검증
 	claims, err := s.JwtService.VerifyRefreshToken(refreshToken)
 	if err != nil {
