@@ -27,9 +27,10 @@ type LoginRequest struct {
 
 // 멤버 전달 객체
 type MemberResponse struct {
-	ID    int64    `json:"id"`
-	Email string   `json:"email"`
-	Roles []string `json:"roles"`
+	ID      int64    `json:"id"`
+	Email   string   `json:"email"`
+	Profile *string  `json:"profile"`
+	Roles   []string `json:"roles"`
 }
 
 // 로그인 응답 DTO
@@ -115,9 +116,10 @@ func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (*LoginRespo
 	}
 
 	loginResponse.Member = MemberResponse{
-		ID:    *member.ID,
-		Email: member.Email,
-		Roles: roles,
+		ID:      *member.ID,
+		Email:   member.Email,
+		Profile: member.Profile,
+		Roles:   roles,
 	}
 
 	return loginResponse, nil
@@ -153,9 +155,10 @@ func (s *AuthService) refresh(ctx context.Context, refreshToken string) (*LoginR
 	return &LoginResponse{
 		AccessToken: accessToken,
 		Member: MemberResponse{
-			ID:    *member.ID,
-			Email: member.Email,
-			Roles: roles,
+			ID:      *member.ID,
+			Email:   member.Email,
+			Profile: member.Profile,
+			Roles:   roles,
 		},
 	}, nil
 }
