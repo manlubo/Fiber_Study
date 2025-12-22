@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"study/pkg/dbmetrics"
-	"study/pkg/log"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -16,6 +15,7 @@ func ApiMetrics() fiber.Handler {
 			return c.Next()
 		}
 
+		// DB metrics context 주입
 		ctx, metrics := dbmetrics.NewContext(c.UserContext())
 		c.SetUserContext(ctx)
 
@@ -36,17 +36,10 @@ func ApiMetrics() fiber.Handler {
 				Observe(float64(metrics.MaxTimeMs) / 1000) // ms → sec
 		}
 
-		log.Info(
-			"[API 성능 로그]",
-			log.MapStr("api", api),
-			log.MapInt64("time", elapsed),
-			log.MapInt("queryCount", metrics.QueryCount),
-			log.MapInt64("maxQueryTime", metrics.MaxTimeMs),
-		)
-
-		if metrics.MaxQuery != "" {
-			log.Debug(metrics.MaxQuery)
-		}
+		// API 응답 시간 통계
+		dbmetrics.ApiDuration.
+			WithLabelValues(api).
+			Observe(float64(elapsed) / 1000)
 
 		return err
 	}

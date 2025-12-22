@@ -1,9 +1,11 @@
 package log
 
 import (
+	"context"
 	"os"
 	"strings"
 
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -104,4 +106,50 @@ func Warn(msg string, fields ...zap.Field) {
 func Error(msg string, fields ...zap.Field) {
 	ensure()
 	instance.zap.Error(msg, fields...)
+}
+
+func TraceFields(ctx context.Context) []zap.Field {
+	span := trace.SpanFromContext(ctx)
+	sc := span.SpanContext()
+
+	if !sc.IsValid() {
+		return nil
+	}
+
+	return []zap.Field{
+		zap.String("trace_id", sc.TraceID().String()),
+		zap.String("span_id", sc.SpanID().String()),
+	}
+}
+
+func DebugCtx(ctx context.Context, msg string, fields ...zap.Field) {
+	ensure()
+	instance.zap.Debug(
+		msg,
+		append(TraceFields(ctx), fields...)...,
+	)
+}
+
+func InfoCtx(ctx context.Context, msg string, fields ...zap.Field) {
+	ensure()
+	instance.zap.Info(
+		msg,
+		append(TraceFields(ctx), fields...)...,
+	)
+}
+
+func WarnCtx(ctx context.Context, msg string, fields ...zap.Field) {
+	ensure()
+	instance.zap.Warn(
+		msg,
+		append(TraceFields(ctx), fields...)...,
+	)
+}
+
+func ErrorCtx(ctx context.Context, msg string, fields ...zap.Field) {
+	ensure()
+	instance.zap.Error(
+		msg,
+		append(TraceFields(ctx), fields...)...,
+	)
 }

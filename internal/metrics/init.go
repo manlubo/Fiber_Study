@@ -7,8 +7,10 @@ import (
 )
 
 func Init() {
-	prometheus.MustRegister(HttpRequestsTotal)
-	prometheus.MustRegister(HttpErrorsTotal)
-
-	prometheus.MustRegister(dbmetrics.QueryMaxDuration)
+	prometheus.MustRegister(
+		dbmetrics.HttpRequestsTotal,
+		dbmetrics.HttpErrorsTotal,
+		dbmetrics.ApiDuration,
+		dbmetrics.QueryMaxDuration,
+	)
 }

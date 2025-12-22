@@ -83,6 +83,8 @@ func main() {
 	})
 
 	// application 실행
+	if err := app.Listen(":" + cfg.App.Port); err != nil {
+		log.Error("server stopped", log.MapErr("error", err))
+	}
 	log.Info("Application is running", log.MapStr("port", cfg.App.Port))
-	app.Listen(":" + cfg.App.Port)
 }

@@ -5,15 +5,48 @@
 ## ✅ 현재 구현 상태 (Current Status)
 
 - [x] **기본 구조**: Clean Architecture 기반의 폴더 구조 확립.
-- [x] **웹 서버**: Fiber v2 프레임워크 적용 및 라우팅 설정.
-- [x] **데이터베이스**: PostgreSQL 연결 및 PGX 드라이버 적용.
-- [x] **설정 관리**: `cleanenv`를 이용한 환경 변수 관리.
-- [x] **관측성 (Observability)**: OpenTelemetry 트레이싱 및 Prometheus 메트릭 엔드포인트 구현.
-- [x] **미들웨어**: CORS, 로깅(Zap), 패닉 복구 미들웨어 적용 완료.
+- [x] **웹 서버**: Fiber v2 + PostgreSQL + PGX.
+- [x] **관측성**: OpenTelemetry Tracing + Prometheus Metrics.
+- [x] **로깅**: Zap 기반의 Context Aware Logging 구현 (Trace ID 자동 주입).
 
 ---
 
-## ��️ 개선 필요 사항 (Improvements & TODO)
+## ��� 개발 규칙 & 컨벤션 (Conventions)
+
+### 1. 로깅 (Logging) & 트레이싱 (Tracing)
+분산 트레이싱 환경에서 로그와 트레이스를 연결하기 위해 **반드시 Context 기반 로깅**을 사용합니다.
+
+- **규칙**: `context.Context`가 사용 가능한 모든 계층(Handler, Service, Repository)에서는 `log.Info`, `log.Error` 대신 **`log.InfoCtx`, `log.ErrorCtx`** 함수를 사용해야 합니다.
+- **이유**: 해당 함수들은 Context 내의 SpanContext에서 `trace_id`와 `span_id`를 자동으로 추출하여 로그 필드에 추가합니다. 이는 Grafana/Tempo 등에서 로그와 트레이스를 연관 짓는 핵심 키가 됩니다.
+
+**예시 (Good)**:
+```go
+func (s *AuthService) Login(ctx context.Context, req LoginRequest) {
+    // ...
+    // 자동으로 trace_id가 로그에 남음
+    log.InfoCtx(ctx, "로그인 성공", log.String("email", req.Email))
+}
+```
+
+**예시 (Bad)**:
+```go
+func (s *AuthService) Login(ctx context.Context, req LoginRequest) {
+    // 트레이스 연결 끊김
+    log.Info("로그인 성공", log.String("email", req.Email)) 
+}
+```
+
+### 2. 메트릭 (Metrics)
+새로운 메트릭을 추가할 때는 다음 절차를 따릅니다.
+
+1. **정의**: `pkg/dbmetrics` 패키지에 메트릭 변수(,  등)를 정의합니다.
+   - 이유: 패키지 순환 참조 방지 및 메트릭 정의의 중앙 관리.
+2. **등록**: `internal/metrics/init.go` 내의 `Init()` 함수에서 `prometheus.MustRegister()`를 통해 등록합니다.
+3. **사용**: 필요한 미들웨어난 로직에서 `dbmetrics.MyMetric.Inc()` 와 같이 사용합니다.
+
+---
+
+## ���️ 개선 필요 사항 (Improvements & TODO)
 
 현재 프로젝트의 완성도를 높이기 위해 다음과 같은 작업들이 필요합니다.
 
@@ -31,18 +64,7 @@
 
 ### 4. 에러 핸들링 고도화
 - **전역 에러 처리**: `GlobalErrorHandler`를 사용하여 예상치 못한 에러도 일관된 JSON 포맷으로 응답.
-- **Custom Error**: 도메인별 비즈니스 에러 타입 정의 (`ErrUserNotFound`, `ErrInvalidPassword` 등).
 
 ### 5. 보안 강화
 - **JWT 관리**: 토큰 만료 시간, 리프레시 토큰 로직 재점검 및 보안 강화.
 - **Security Headers**: Helmet 등 보안 헤더 미들웨어 추가.
-
----
-
-## ��� 기여 방법 (Contribution)
-
-1. **이슈 확인**: `docs/develop.md`의 개선 사항 중 작업할 내용을 선택합니다.
-2. **브랜치 생성**: `feature/기능명` 또는 `fix/버그명` 형태로 브랜치를 생성합니다.
-3. **코드 작성**: 기존 코드 스타일과 컨벤션을 준수하여 코드를 작성합니다.
-4. **테스트**: 변경 사항에 대한 테스트를 수행합니다.
-5. **PR 요청**: 작업 내용을 상세히 작성하여 Pull Request를 보냅니다.

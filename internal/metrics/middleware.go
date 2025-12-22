@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"strconv"
+	"study/pkg/dbmetrics"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -28,7 +29,7 @@ func Middleware() fiber.Handler {
 		statusStr := strconv.Itoa(status)
 
 		// 전체 요청 카운트
-		HttpRequestsTotal.WithLabelValues(
+		dbmetrics.HttpRequestsTotal.WithLabelValues(
 			method,
 			path,
 			statusStr,
@@ -36,7 +37,7 @@ func Middleware() fiber.Handler {
 
 		// 에러만 따로 카운트
 		if status >= 400 {
-			HttpErrorsTotal.WithLabelValues(
+			dbmetrics.HttpErrorsTotal.WithLabelValues(
 				method,
 				path,
 				statusStr,

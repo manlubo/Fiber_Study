@@ -97,6 +97,7 @@ func (s *AuthService) Register(ctx context.Context, m *member.Member) error {
 		return err
 	}
 
+	log.InfoCtx(ctx, "회원가입 성공")
 	// 커밋
 	return tx.Commit(ctx)
 }
@@ -111,14 +112,12 @@ func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (*LoginRespo
 	if err != nil {
 		return nil, ErrInvalidCredential
 	}
-	log.Info("이메일 조회 성공")
 
 	// 비밀번호 비교
 	err = util.VerifyHashString(req.Password, member.Password)
 	if err != nil {
 		return nil, ErrInvalidCredential
 	}
-	log.Info("비밀번호 비교 성공")
 
 	// 권한 조회
 	roles, err := s.MemberRepository.GetRolesByMemberID(ctx, s.DB, *member.ID)
@@ -139,6 +138,7 @@ func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (*LoginRespo
 		Roles:   roles,
 	}
 
+	log.InfoCtx(ctx, "로그인 성공")
 	return loginResponse, nil
 }
 
@@ -171,6 +171,7 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*LoginR
 		return nil, err
 	}
 
+	log.InfoCtx(ctx, "로그인 유지 성공")
 	// 리프레쉬 토큰 제외한 로그인 응답 반환
 	return &LoginResponse{
 		AccessToken: accessToken,
