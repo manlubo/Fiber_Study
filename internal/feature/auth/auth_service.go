@@ -10,6 +10,7 @@ import (
 	"study/pkg/log"
 	"study/pkg/util"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 )
 
@@ -50,8 +51,8 @@ func NewAuthService(MemberRepository *member.MemberRepository, JwtService *JwtSe
 
 // 회원가입
 func (s *AuthService) Register(ctx context.Context, m *member.Member) error {
-	ctx, span := observability.Tracer.Start(ctx, "service.Register")
-	defer span.End()
+	ctx, span, start := observability.StartServiceSpan(ctx, "service.Register")
+	defer observability.EndSpanWithLatency(span, start, 100)
 
 	// 트랜젝션 시작
 	tx, err := s.DB.Begin(ctx)
@@ -104,8 +105,8 @@ func (s *AuthService) Register(ctx context.Context, m *member.Member) error {
 
 // 로그인
 func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (*LoginResponse, error) {
-	ctx, span := observability.Tracer.Start(ctx, "service.Login")
-	defer span.End()
+	ctx, span, start := observability.StartServiceSpan(ctx, "service.Login")
+	defer observability.EndSpanWithLatency(span, start, 0)
 
 	// 이메일로 회원 조회
 	member, err := s.MemberRepository.FindByEmail(ctx, s.DB, req.Email)
@@ -131,6 +132,11 @@ func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (*LoginRespo
 		return nil, err
 	}
 
+	span.SetAttributes(
+		attribute.String("auth.type", "login"),
+		attribute.Int64("member.id", *member.ID),
+	)
+
 	loginResponse.Member = MemberResponse{
 		ID:      *member.ID,
 		Email:   member.Email,
@@ -144,8 +150,8 @@ func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (*LoginRespo
 
 // 리프레쉬 토큰으로 로그인 상태 유지
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*LoginResponse, error) {
-	ctx, span := observability.Tracer.Start(ctx, "service.Refresh")
-	defer span.End()
+	ctx, span, start := observability.StartServiceSpan(ctx, "service.Refresh")
+	defer observability.EndSpanWithLatency(span, start, 30)
 
 	// refresh token 검증
 	claims, err := s.JwtService.VerifyRefreshToken(refreshToken)
@@ -170,6 +176,11 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*LoginR
 	if err != nil {
 		return nil, err
 	}
+
+	span.SetAttributes(
+		attribute.String("auth.type", "refresh"),
+		attribute.Int64("member.id", *member.ID),
+	)
 
 	log.InfoCtx(ctx, "로그인 유지 성공")
 	// 리프레쉬 토큰 제외한 로그인 응답 반환

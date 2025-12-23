@@ -8,9 +8,10 @@ services:
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.96.0
-    command: ["--config=/etc/otel-collector.yml"]
+    container_name: otel-collector
+    command: ["--config=/etc/otel/collector.yml"]
     volumes:
-      - ./otel-collector.yml:/etc/otel-collector.yml
+      - ${OTEL_COLLECTOR_CONFIG}:/etc/otel/collector.yml
     ports:
       - "4318:4318"
     depends_on:

@@ -44,4 +44,4 @@ observability:
   enabled: true
   serviceName: myapp-dev
   otlpEndpoint: localhost:4318
-  sampleRatio: 0.5
+  sampleRatio: 1
