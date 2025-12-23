@@ -10,6 +10,7 @@ import (
 
 	"study/pkg/util"
 
+	"github.com/exaring/otelpgx"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -31,16 +32,25 @@ func CreateDsn(cfg *config.Postgres) string {
 func NewPostgres(cfg *config.Postgres) (*pgxpool.Pool, error) {
 	dsn := CreateDsn(cfg)
 
-	// 연결 풀 생성
-	pool, err := pgxpool.New(context.Background(), dsn)
+	// config 파싱
+	poolCfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, err
 	}
 
+	// tracer 설정
+	poolCfg.ConnConfig.Tracer = otelpgx.NewTracer()
+
 	// 연결 풀 설정
-	pool.Config().MaxConns = int32(cfg.MaxOpenConns)
-	pool.Config().MinConns = int32(cfg.MaxIdleConns)
-	pool.Config().MaxConnLifetime = 30 * time.Minute
+	poolCfg.MaxConns = int32(cfg.MaxOpenConns)
+	poolCfg.MinConns = int32(cfg.MaxIdleConns)
+	poolCfg.MaxConnLifetime = 30 * time.Minute
+
+	// 연결 풀 생성
+	pool, err := pgxpool.NewWithConfig(context.Background(), poolCfg)
+	if err != nil {
+		return nil, err
+	}
 
 	// 연결 테스트
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

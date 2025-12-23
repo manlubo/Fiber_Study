@@ -2,12 +2,10 @@ package auth
 
 import (
 	"study/internal/feature/member"
-	"study/internal/observability"
 	"study/internal/shared/errorx"
 	"study/pkg/response"
 
 	"github.com/gofiber/fiber/v2"
-	"go.opentelemetry.io/otel/codes"
 )
 
 // Handler
@@ -20,11 +18,9 @@ func NewAuthHandler(service *AuthService, cookieService *CookieService) *AuthHan
 	return &AuthHandler{service: service, cookieService: cookieService}
 }
 
+// 회원가입
 func (h *AuthHandler) SignUp(c *fiber.Ctx) error {
 	ctx := c.UserContext()
-
-	ctx, span := observability.Tracer.Start(ctx, "handler.SignUp")
-	defer span.End()
 
 	var req member.Member
 
@@ -46,19 +42,13 @@ func (h *AuthHandler) SignUp(c *fiber.Ctx) error {
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
-	ctx, span := observability.Tracer.Start(ctx, "handler.Login")
-	defer span.End()
-
 	var req LoginRequest
 
 	if err := c.BodyParser(&req); err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "body parse failed")
 		return c.Status(fiber.StatusBadRequest).JSON(response.Error(errorx.ErrRequestParseFailed.Error(), "JSON 파싱 실패", nil))
 	}
 
 	if req.Email == "" || req.Password == "" {
-		span.AddEvent(errorx.ErrRequiredFieldMissing.Error())
 		return c.Status(fiber.StatusBadRequest).JSON(response.Error(errorx.ErrRequiredFieldMissing.Error(), "필수값 누락", nil))
 	}
 
@@ -76,9 +66,6 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
-	ctx, span := observability.Tracer.Start(ctx, "handler.Refresh")
-	defer span.End()
-
 	refreshToken := h.cookieService.GetCookie(c)
 	if refreshToken == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(response.Error(ErrCookieNotFound.Error(), "리프레쉬 쿠키 누락", nil))
@@ -92,11 +79,6 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 }
 
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
-	ctx := c.UserContext()
-
-	_, span := observability.Tracer.Start(ctx, "handler.Logout")
-	defer span.End()
-
 	h.cookieService.RemoveCookie(c)
 	return c.Status(fiber.StatusOK).JSON(response.OK("로그아웃 성공", nil))
 }

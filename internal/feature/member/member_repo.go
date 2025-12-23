@@ -3,11 +3,8 @@ package member
 import (
 	"context"
 
-	"study/internal/observability"
 	"study/internal/shared/db"
 	"study/internal/shared/model"
-
-	"go.opentelemetry.io/otel/attribute"
 )
 
 // DB 테이블과 일치
@@ -39,15 +36,6 @@ func NewMemberRepository() *MemberRepository {
 
 // 회원가입
 func (r *MemberRepository) Create(ctx context.Context, exec db.Execer, member *Member) error {
-	ctx, span := observability.Tracer.Start(ctx, "repo.Create.Member")
-	defer span.End()
-
-	span.SetAttributes(
-		attribute.String("db.system", "postgresql"),
-		attribute.String("db.operation", "INSERT"),
-		attribute.String("db.table", "members"),
-	)
-
 	query := `
 		INSERT INTO members (
 			email,
@@ -85,15 +73,6 @@ func (r *MemberRepository) Create(ctx context.Context, exec db.Execer, member *M
 
 // 권한 추가
 func (r *MemberRepository) InsertRole(ctx context.Context, exec db.Execer, memberID int64, role Role) error {
-	ctx, span := observability.Tracer.Start(ctx, "repo.InsertRole")
-	defer span.End()
-
-	span.SetAttributes(
-		attribute.String("db.system", "postgresql"),
-		attribute.String("db.operation", "INSERT"),
-		attribute.String("db.table", "member_roles"),
-	)
-
 	query := `
 		INSERT INTO member_roles (member_id, role)
 		VALUES ($1, $2)
@@ -109,15 +88,6 @@ func (r *MemberRepository) GetRolesByMemberID(
 	exec db.Execer,
 	memberID int64,
 ) ([]Role, error) {
-	ctx, span := observability.Tracer.Start(ctx, "repo.GetRolesByMemberID")
-	defer span.End()
-
-	span.SetAttributes(
-		attribute.String("db.system", "postgresql"),
-		attribute.String("db.operation", "SELECT"),
-		attribute.String("db.table", "member_roles"),
-	)
-
 	query := `
 		SELECT role
 		FROM member_roles
@@ -144,15 +114,6 @@ func (r *MemberRepository) GetRolesByMemberID(
 
 // 이메일로 회원 조회
 func (r *MemberRepository) FindByEmail(ctx context.Context, exec db.Execer, email string) (*Member, error) {
-	ctx, span := observability.Tracer.Start(ctx, "repo.FindByEmail.Member")
-	defer span.End()
-
-	span.SetAttributes(
-		attribute.String("db.system", "postgresql"),
-		attribute.String("db.operation", "SELECT"),
-		attribute.String("db.table", "members"),
-	)
-
 	query := `
 		SELECT
 			member_id,
@@ -194,15 +155,6 @@ func (r *MemberRepository) FindByEmail(ctx context.Context, exec db.Execer, emai
 
 // ID로 회원 조회
 func (r *MemberRepository) FindByID(ctx context.Context, exec db.Execer, id int64) (*Member, error) {
-	ctx, span := observability.Tracer.Start(ctx, "repo.FindByID.Member")
-	defer span.End()
-
-	span.SetAttributes(
-		attribute.String("db.system", "postgresql"),
-		attribute.String("db.operation", "SELECT"),
-		attribute.String("db.table", "members"),
-	)
-
 	query := `
 		SELECT
 			member_id,

@@ -3,6 +3,7 @@ module study
 go 1.25.4
 
 require (
+	github.com/exaring/otelpgx v0.9.4
 	github.com/gofiber/fiber/v2 v2.52.10
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/golang-migrate/migrate/v4 v4.19.1
