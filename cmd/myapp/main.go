@@ -64,6 +64,7 @@ func main() {
 	}
 	log.Info("데이터베이스 마이그레이션 성공")
 
+	// sqlc 등록
 	queries := query.New(postgresdb)
 
 	// auth 관련
