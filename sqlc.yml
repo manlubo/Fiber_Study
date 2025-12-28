@@ -1,0 +1,24 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema:
+      - "migrations"
+    queries:
+      - "internal/query"
+    gen:
+      go:
+        package: "query"
+        out: "internal/query"
+        sql_package: "pgx/v5"
+        overrides:
+          # members.status → model.Status
+          - column: "members.status"
+            go_type:
+              import: "study/internal/shared/model"
+              type: "Status"
+
+          # member_roles.role → member.Role
+          - column: "member_roles.role"
+            go_type:
+              import: "study/internal/feature/member"
+              type: "Role"

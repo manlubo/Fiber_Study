@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"study/internal/feature/member"
 	"study/internal/shared/errorx"
 	"study/pkg/response"
 
@@ -22,7 +21,7 @@ func NewAuthHandler(service *AuthService, cookieService *CookieService) *AuthHan
 func (h *AuthHandler) SignUp(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
-	var req member.Member
+	var req SignUpRequest
 
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(response.Error(errorx.ErrRequestParseFailed.Error(), "JSON 파싱 실패", nil))

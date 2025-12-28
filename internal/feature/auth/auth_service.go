@@ -5,20 +5,29 @@ import (
 
 	"study/internal/feature/member"
 	"study/internal/observability"
-	"study/internal/shared/db"
+	"study/internal/query"
+	"study/internal/shared/mapper"
 	"study/internal/shared/model"
 	"study/pkg/log"
 	"study/pkg/util"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel/attribute"
 )
 
 // AuthService
 // - 인증/회원가입 비즈니스 로직 전용
 type AuthService struct {
-	MemberRepository *member.MemberRepository
-	JwtService       *JwtService
-	DB               db.DB
+	JwtService *JwtService
+	pool       *pgxpool.Pool
+	queries    *query.Queries
+}
+
+// 회원가입 요청 DTO
+type SignUpRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Name     string `json:"name"`
 }
 
 // 로그인 요청 DTO
@@ -44,25 +53,27 @@ type LoginResponse struct {
 }
 
 // 생성자
-func NewAuthService(MemberRepository *member.MemberRepository, JwtService *JwtService, DB db.DB) *AuthService {
-	return &AuthService{MemberRepository: MemberRepository, JwtService: JwtService, DB: DB}
+func NewAuthService(pool *pgxpool.Pool, queries *query.Queries, JwtService *JwtService) *AuthService {
+	return &AuthService{pool: pool, queries: queries, JwtService: JwtService}
 }
 
 // 회원가입
-func (s *AuthService) Register(ctx context.Context, m *member.Member) (err error) {
+func (s *AuthService) Register(ctx context.Context, m *SignUpRequest) (err error) {
 	ctx, span, start := observability.StartServiceSpan(ctx, "Register")
 	defer observability.EndSpanWithLatency(span, start, 100)
 
 	// 트랜젝션 시작
-	tx, err := s.DB.Begin(ctx)
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		observability.RecordServiceError(span, err)
 		return err
 	}
 	defer tx.Rollback(ctx)
 
+	transaction := s.queries.WithTx(tx)
+
 	// 이메일 중복 체크
-	_, err = s.MemberRepository.FindByEmail(ctx, tx, m.Email)
+	_, err = transaction.FindMemberByEmail(ctx, m.Email)
 	if err == nil {
 		observability.RecordBusinessError(span, ErrEmailAlreadyExists)
 		return ErrEmailAlreadyExists
@@ -74,20 +85,24 @@ func (s *AuthService) Register(ctx context.Context, m *member.Member) (err error
 		observability.RecordServiceError(span, err)
 		return err
 	}
-	m.Password = hashed
-
-	// 상태값 부여
-	m.Status = model.StatusActive
 
 	// 회원생성
-	err = s.MemberRepository.Create(ctx, tx, m)
+	memberID, err := transaction.CreateMember(ctx, query.CreateMemberParams{
+		Email:    m.Email,
+		Password: hashed,
+		Name:     m.Name,
+		Status:   model.StatusActive,
+	})
 	if err != nil {
 		observability.RecordServiceError(span, err)
 		return err
 	}
 
 	// 기본권한 추가
-	err = s.MemberRepository.InsertRole(ctx, tx, *m.ID, member.RoleUser)
+	err = transaction.InsertMemberRole(ctx, query.InsertMemberRoleParams{
+		MemberID: memberID,
+		Role:     member.RoleUser,
+	})
 	if err != nil {
 		observability.RecordServiceError(span, err)
 		return err
@@ -95,7 +110,7 @@ func (s *AuthService) Register(ctx context.Context, m *member.Member) (err error
 
 	span.SetAttributes(
 		attribute.String("auth.type", "register"),
-		attribute.Int64("member.id", *m.ID),
+		attribute.Int64("member.id", memberID),
 	)
 
 	log.InfoCtx(ctx, "회원가입 성공")
@@ -115,7 +130,7 @@ func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (resp *Login
 	defer observability.EndSpanWithLatency(span, start, 0)
 
 	// 이메일로 회원 조회
-	member, err := s.MemberRepository.FindByEmail(ctx, s.DB, req.Email)
+	member, err := s.queries.FindMemberByEmail(ctx, req.Email)
 	if err != nil {
 		observability.RecordBusinessError(span, ErrInvalidCredential)
 		return nil, ErrInvalidCredential
@@ -129,14 +144,14 @@ func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (resp *Login
 	}
 
 	// 권한 조회
-	roles, err := s.MemberRepository.GetRolesByMemberID(ctx, s.DB, *member.ID)
+	roles, err := s.queries.GetRolesByMemberID(ctx, member.MemberID)
 	if err != nil {
 		observability.RecordServiceError(span, err)
 		return nil, err
 	}
 
 	// 토큰 생성
-	loginResponse, err := s.JwtService.Login(*member.ID)
+	loginResponse, err := s.JwtService.Login(member.MemberID)
 	if err != nil {
 		observability.RecordServiceError(span, err)
 		return nil, err
@@ -144,13 +159,13 @@ func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (resp *Login
 
 	span.SetAttributes(
 		attribute.String("auth.type", "login"),
-		attribute.Int64("member.id", *member.ID),
+		attribute.Int64("member.id", member.MemberID),
 	)
 
 	loginResponse.Member = MemberResponse{
-		ID:      *member.ID,
+		ID:      member.MemberID,
 		Email:   member.Email,
-		Profile: member.Profile,
+		Profile: mapper.TextPtr(member.Profile),
 		Roles:   roles,
 	}
 
@@ -181,21 +196,21 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (resp *L
 	}
 
 	// 회원 찾기
-	member, err := s.MemberRepository.FindByID(ctx, s.DB, claims.MemberID)
+	member, err := s.queries.FindMemberByID(ctx, claims.MemberID)
 	if err != nil {
 		observability.RecordServiceError(span, err)
 		return nil, err
 	}
 
 	// 권한 조회
-	roles, err := s.MemberRepository.GetRolesByMemberID(ctx, s.DB, *member.ID)
+	roles, err := s.queries.GetRolesByMemberID(ctx, member.MemberID)
 	if err != nil {
 		observability.RecordServiceError(span, err)
 		return nil, err
 	}
 
 	// 엑세스 토큰 생성
-	accessToken, err := s.JwtService.GenerateAccessToken(*member.ID)
+	accessToken, err := s.JwtService.GenerateAccessToken(member.MemberID)
 	if err != nil {
 		observability.RecordServiceError(span, err)
 		return nil, err
@@ -203,7 +218,7 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (resp *L
 
 	span.SetAttributes(
 		attribute.String("auth.type", "refresh"),
-		attribute.Int64("member.id", *member.ID),
+		attribute.Int64("member.id", member.MemberID),
 	)
 
 	log.InfoCtx(ctx, "로그인 유지 성공")
@@ -211,9 +226,9 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (resp *L
 	return &LoginResponse{
 		AccessToken: accessToken,
 		Member: MemberResponse{
-			ID:      *member.ID,
+			ID:      member.MemberID,
 			Email:   member.Email,
-			Profile: member.Profile,
+			Profile: mapper.TextPtr(member.Profile),
 			Roles:   roles,
 		},
 	}, nil

@@ -8,8 +8,8 @@ import (
 	"study/internal/metrics"
 	"study/internal/middleware"
 	"study/internal/observability"
+	"study/internal/query"
 	"study/internal/router"
-	"study/pkg/dbmetrics"
 	"study/pkg/log"
 	"study/pkg/response"
 	"study/pkg/util"
@@ -64,7 +64,7 @@ func main() {
 	}
 	log.Info("데이터베이스 마이그레이션 성공")
 
-	metricsDB := dbmetrics.New(postgresdb)
+	queries := query.New(postgresdb)
 
 	// auth 관련
 	jwtService := auth.NewJwtService(&cfg.JWT)
@@ -72,7 +72,7 @@ func main() {
 	authMiddleware := middleware.NewAuthMiddlewareConfig(cfg.Cookie.Name)
 
 	// 라우터
-	router.Register(app, metricsDB, jwtService, cookieService, authMiddleware)
+	router.Register(app, postgresdb, queries, jwtService, cookieService, authMiddleware)
 
 	// metrics 등록
 	metrics.Register(app)
